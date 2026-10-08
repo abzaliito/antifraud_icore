@@ -125,3 +125,4 @@ python backend/evaluate.py
 - **Темирлан Аскаров** — Product Manager & Data Analyst
 
 *Контакты: support@scamcheck.kz*
+# antifraud_icore

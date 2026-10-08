@@ -120,9 +120,8 @@ python backend/evaluate.py
 
 ## 👥 Команда Проекта (Astana IT University)
 
-- **Алихан Смаилов** — ML Engineer & AI Architecture
-- **Динара Нургалиева** — Full-stack & Security Engineer
-- **Темирлан Аскаров** — Product Manager & Data Analyst
+- **Gulnur Shuteyeva** — Head of the project
+- **Birkhanym Kazhymukhamet** — Full-stack & AI Engineer
+- **Abzal Bakhytov** — Backend & ML Engineer
 
-*Контакты: support@scamcheck.kz*
 # antifraud_icore

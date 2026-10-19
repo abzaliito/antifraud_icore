@@ -56,7 +56,7 @@ class AnalyzeFraudUseCase:
 
         total_score = min(98, total_score)
 
-        if total_score >= 50:
+        if total_score >= 55:
             level = RiskLevel.HIGH_RISK
         elif total_score >= 25:
             level = RiskLevel.SUSPICIOUS

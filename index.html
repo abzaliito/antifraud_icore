@@ -983,7 +983,7 @@ function renderEmpty(){
   `;
 }
 
-function runAnalysis(){
+async function runAnalysis(){
   const text=$("#msg").value.trim();
   if(!text){
     $("#rBody").innerHTML=`<p style="color:var(--warn-ink);padding:16px;background:var(--warn-soft);border-radius:12px;font-weight:600">${T[lang].need}</p>`;
@@ -994,14 +994,79 @@ function runAnalysis(){
   void box.offsetWidth; 
   box.classList.add("loading");
   
+  // Try live FastAPI backend first
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1200);
+    const resp = await fetch("http://localhost:8000/api/v1/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text, lang: lang }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if(resp.ok){
+      const data = await resp.json();
+      box.classList.remove("loading");
+      showLiveBackendResult(data, text, true);
+      return;
+    }
+  } catch(e) {
+    // Backend offline: seamlessly fallback to local client-side model
+  }
+
   setTimeout(()=>{
     box.classList.remove("loading"); 
     showResult(text, true);
-  }, 600);
+  }, 400);
+}
+
+function showLiveBackendResult(data, text, animate){
+  lastCheckedText = text;
+  const t = T[lang];
+  const title = {safe:t.v_safe, warn:t.v_warn, risk:t.v_risk}[data.level] || t.v_safe;
+  const todo = data.recommendations && data.recommendations.length ? data.recommendations : {safe:t.todo_safe, warn:t.todo_warn, risk:t.todo_risk}[data.level];
+  const ranges = (data.highlights || []).map(h => [h.start, h.end]);
+
+  $("#rBody").innerHTML=`
+    <div class="r-head">
+      ${renderGauge(animate?0:data.score, data.level)}
+      <div class="r-title">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span class="pill ${data.level}">${data.level==="risk"?t.lv_risk:data.level==="warn"?t.lv_warn:t.lv_safe}</span>
+          <span style="background:rgba(20,184,166,0.15);color:var(--teal-ink);padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700">⚡ FastAPI 2.0 (${data.processing_time_ms} ms)</span>
+        </div>
+        <h3>${title}</h3>
+        ${data.scheme_name && data.level!=="safe" ? `<p style="color:var(--teal-ink);font-size:14px;font-weight:600">${t.scheme}: «${data.scheme_name}»</p>` : ""}
+      </div>
+    </div>
+    ${data.triggers && data.triggers.length ? `<div>
+      <p style="font-weight:700;font-size:14px;margin-bottom:8px;color:var(--fg)">${t.found}</p>
+      <div class="r-flags">${data.triggers.map(tr=>`<span>${tr}</span>`).join("")}</div>
+    </div>` : ""}
+    <div class="r-text">${highlightText(text, ranges)}</div>
+    <div class="todo">
+      <h4>${t.todo}</h4>
+      <ul>${todo.map(x=>`<li>${x}</li>`).join("")}</ul>
+    </div>
+  `;
+
+  if(animate){
+    requestAnimationFrame(()=>{
+      const arc=$("#arc"), c=2*Math.PI*44; 
+      arc.style.strokeDashoffset=c*(1-data.score/100);
+      const n=$("#num"), t0=performance.now(); 
+      (function tick(now){
+        const k=Math.min(1, (now-t0)/900); 
+        n.textContent=Math.round(data.score*(1-Math.pow(1-k,3))); 
+        if(k<1) requestAnimationFrame(tick);
+      })(t0);
+    });
+  }
 }
 
 // Telegram Bot Simulator
-function sendTgSimMessage(userText){
+async function sendTgSimMessage(userText){
   const container = $("#tgMessages");
   const userDiv = document.createElement("div");
   userDiv.className = "tg-msg user";
@@ -1009,35 +1074,75 @@ function sendTgSimMessage(userText){
   container.appendChild(userDiv);
   container.scrollTop = container.scrollHeight;
 
+  let r = null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1000);
+    const resp = await fetch("http://localhost:8000/api/v1/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: userText, lang: lang }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if(resp.ok) r = await resp.json();
+  } catch(e) {}
+
+  if(!r) {
+    const local = analyzeMessage(userText);
+    r = {
+      score: local.score,
+      level: local.level,
+      scheme_name: local.scheme ? SCHEMES.find(s=>s.id===local.scheme)[lang][0] : null,
+      triggers: local.flags.map(f=>f[lang])
+    };
+  }
+
   setTimeout(()=>{
-    const r = analyzeMessage(userText);
     const botDiv = document.createElement("div");
     botDiv.className = "tg-msg bot";
-    
     let botReply = "";
     if(r.level === "risk"){
-      botReply = `🚨 ВНИМАНИЕ! Высокий риск мошенничества (${r.score}%).\n\nОбнаружены триггеры: ${r.flags.map(f=>f[lang]).join(", ")}.\n\n⚠️ Не переводите деньги! Банк не запрашивает переводы на резервные счета.`;
+      botReply = `🚨 ВНИМАНИЕ! Высокий риск мошенничества (${r.score}%).\n\n📌 Схема: ${r.scheme_name || 'Социальная инженерия'}\nОбнаружены триггеры: ${r.triggers.join(", ")}.\n\n⚠️ Не переводите деньги! Банк не запрашивает переводы на резервные счета.`;
     } else if(r.level === "warn"){
-      botReply = `⚠️ Подозрительное сообщение (${r.score}% риска).\n\nОбратите внимание: ${r.flags.map(f=>f[lang]).join(", ")}.\nБудьте осторожны!`;
+      botReply = `⚠️ Подозрительное сообщение (${r.score}% риска).\n\nОбратите внимание: ${r.triggers.join(", ")}.\nБудьте осторожны!`;
     } else {
       botReply = `✅ Сообщение выглядит безопасно (${r.score}% риска). Явных маркеров обмана не обнаружено.`;
     }
-    
     botDiv.innerText = botReply;
     container.appendChild(botDiv);
     container.scrollTop = container.scrollHeight;
-  }, 700);
+  }, 400);
 }
 
 // Event Listeners
 $("#demoForm").addEventListener("submit", e=>{ e.preventDefault(); runAnalysis(); });
 $("#msg").addEventListener("input", updateCharCount);
 
-$("#shot").addEventListener("change", e=>{
+$("#shot").addEventListener("change", async e=>{
   if(e.target.files[0]){
     const file = e.target.files[0];
     $("#shotLbl").textContent = "✓ " + file.name;
-    // Simulate screenshot text extraction
+    
+    // Attempt backend OCR upload
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const resp = await fetch(`http://localhost:8000/api/v1/analyze-screenshot?lang=${lang}`, {
+        method: "POST",
+        body: fd
+      });
+      if(resp.ok){
+        const data = await resp.json();
+        $("#msg").value = data.extracted_text;
+        updateCharCount();
+        showLiveBackendResult(data.analysis, data.extracted_text, true);
+        return;
+      }
+    } catch(err) {
+      // Fallback
+    }
+
     $("#msg").value = EX[lang][0][1];
     updateCharCount();
     runAnalysis();

@@ -1,65 +1,56 @@
 # Deploy — ScamCheck KZ
 
-Two parts: a static **frontend** (Vite/React) and a **backend** (FastAPI).
-The frontend works on its own — if the backend is unreachable (or a free-tier
-server is cold), it analyzes in the browser with a built-in port of the detector
-(a 4s request timeout triggers the fallback). Connect the backend to serve the
-real Python engine.
+**One Vercel project serves everything:** the static React frontend **and** the
+FastAPI backend as a Python serverless function under `/api/*` (same origin — no
+CORS, no separate server, no cold-start sleeping). If the function ever fails,
+the frontend still analyzes in the browser via its built-in engine.
 
-Recommended: **frontend → Vercel**, **backend → Render**.
-
-## 1. Frontend → Vercel (~2 min)
+## Deploy to Vercel (~2 min)
 
 1. Go to <https://vercel.com/new> → **Import** `abzaliito/antifraud_icore`.
-2. Leave **Root Directory = repo root** — the root `vercel.json` builds `frontend/`
-   and serves `frontend/dist`. (Or set Root Directory = `frontend`; both work.)
-3. **Deploy** → public URL like `https://scamcheck-kz.vercel.app`.
-4. After the backend is live (part 2), add env var **`VITE_API_BASE`** =
-   your backend URL in **Settings → Environment Variables**, then **Redeploy**.
+2. **Root Directory = repo root** (leave as is). The root `vercel.json`:
+   - builds the frontend (`cd frontend && npm install && npm run build` → `frontend/dist`),
+   - serves `backend/app/main.py` as a Python function at `/api/*` (`api/index.py`).
+3. **Deploy**. Done — one URL, e.g. `https://scamcheck-kz.vercel.app`.
 
-CLI alternative: `cd frontend && vercel --prod` (needs `vercel login`).
+**Do NOT set `VITE_API_BASE`** — the frontend calls same-origin `/api`, which the
+serverless function handles.
 
-## 2. Backend → Render (~3 min, free)
+### Verify after deploy
+- `https://<proj>.vercel.app/` → the site, live scanner works
+- `https://<proj>.vercel.app/api/v1/health` → `{"status":"healthy", ...}`
+- `https://<proj>.vercel.app/api/docs` → Swagger UI (B2B bank API, schemes, etc.)
 
-The repo has a `render.yaml` blueprint.
-
-1. Go to <https://dashboard.render.com> → **New → Blueprint**.
-2. Connect this repo and **Apply** — it reads `render.yaml` and creates a
-   Python web service:
-   - Root Directory: `backend`
-   - Build: `pip install -r requirements.txt`
-   - Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - Health check: `/api/v1/health`
-3. You get a URL like `https://scamcheck-kz-api.onrender.com`.
-   Check it: open `.../api/v1/health` → `{"status":"healthy",...}`, docs at `/docs`.
-
-Manual alternative (no blueprint): New → Web Service → Root Directory `backend`,
-same build/start commands as above.
-
-CORS is open (`allow_origins=["*"]`), so the Vercel frontend can call it cross-origin.
-
-> Free tier sleeps when idle (first request cold ~30–50s). That's fine here: the
-> frontend's 4s timeout falls back to the in-browser engine, so the demo never hangs.
-> For a judged live demo with no cold starts, the static-only path is the safest.
-
-## 3. Wire them together
-
-In Vercel → the project → Settings → Environment Variables:
+## How it fits together
 
 ```
-VITE_API_BASE = https://scamcheck-kz-api.onrender.com
+Browser ──/              → frontend/dist (static, CDN)
+        └─/api/v1/...     → api/index.py → backend/app/main.py (FastAPI, @vercel/python)
 ```
 
-Redeploy the frontend. Now the live demo uses the real backend; if it's cold or
-down, it falls back locally automatically.
+- `api/index.py` adds `backend/` to `sys.path` and re-exports the FastAPI `app`.
+- `requirements.txt` (repo root) installs the function deps (fastapi, pydantic,
+  python-multipart).
+- `vercel.json` wires the build + routes `/api/*` to the function and other paths
+  to the SPA.
+
+> Note: OCR (screenshot) uses the built-in heuristic extractor on Vercel
+> (tesseract isn't installed in the serverless runtime). Text analysis is full.
+
+## Alternatives
+
+- **Static only (no backend):** deploy just `frontend/` to any static host; the
+  in-browser engine handles analysis. Simplest, zero servers.
+- **Separate backend on Render:** a `render.yaml` blueprint is included; then set
+  `VITE_API_BASE` in Vercel to the Render URL. (Free tier cold-starts ~30–50s.)
 
 ## Local run
 
 ```bash
 # backend
 cd backend && pip install -r requirements.txt
-uvicorn app.main:app --port 8000
+uvicorn app.main:app --port 8000         # Swagger: http://localhost:8000/api/docs
 
 # frontend (proxies /api -> :8000)
-cd frontend && npm install && npm run dev   # http://localhost:5173
+cd frontend && npm install && npm run dev  # http://localhost:5173
 ```

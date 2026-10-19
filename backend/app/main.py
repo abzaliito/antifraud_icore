@@ -31,8 +31,9 @@ app = FastAPI(
         "(Kaspi, Halyk, BCC, Freedom, Jusan). Конкурс АБРК 2026 — Astana IT University."
     ),
     version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # CORS Middleware configuration
@@ -114,7 +115,7 @@ def read_root():
         "architecture": "Clean Architecture / Domain-Driven Design",
         "contest": "Республиканский конкурс студенческих проектов АБРК 2026",
         "university": "Astana IT University (Кафедра Компьютерной Инженерии и ИИ)",
-        "docs": "/docs",
+        "docs": "/api/docs",
         "health": "/api/v1/health",
         "metrics": "/api/v1/metrics"
     }

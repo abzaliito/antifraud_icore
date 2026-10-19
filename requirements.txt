@@ -1,0 +1,6 @@
+# Dependencies for the Vercel Python serverless function (api/index.py).
+# Runtime engine only — no uvicorn (Vercel provides the ASGI server),
+# no aiogram/pytest (not used by the API).
+fastapi>=0.110.0
+pydantic>=2.5.0
+python-multipart>=0.0.9

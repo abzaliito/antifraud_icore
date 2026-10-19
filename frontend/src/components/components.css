@@ -548,6 +548,22 @@
   padding: 1px 4px;
   font-weight: 600;
 }
+.local-note {
+  font-size: 12px;
+  color: var(--fg-dim);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: -6px;
+}
+.local-note::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  flex: none;
+}
 .r-block h4 {
   margin: 0 0 10px;
   font: 700 14px var(--f-display);

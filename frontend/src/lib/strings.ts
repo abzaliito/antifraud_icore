@@ -89,6 +89,7 @@ const ru = {
     schemeLabel: "Определённая схема",
     triggersLabel: "Обнаруженные маркеры обмана",
     adviceLabel: "Что делать",
+    localNote: "Проанализировано встроенным движком (бэкенд недоступен)",
     errorTitle: "Сервис анализа недоступен",
     errorHint:
       "Запустите бэкенд: uvicorn app.main:app --port 8000 (из папки backend). Демо обращается к /api/v1/analyze.",
@@ -203,6 +204,7 @@ const kz: Dict = {
     schemeLabel: "Анықталған схема",
     triggersLabel: "Табылған алаяқтық белгілері",
     adviceLabel: "Не істеу керек",
+    localNote: "Ендірілген қозғалтқышпен талданды (бэкенд қолжетімсіз)",
     errorTitle: "Талдау қызметі қолжетімсіз",
     errorHint:
       "Бэкендті іске қосыңыз: uvicorn app.main:app --port 8000 (backend папкасынан). Демо /api/v1/analyze-ке жүгінеді.",

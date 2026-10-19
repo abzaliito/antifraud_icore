@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useI18n } from "../lib/i18n";
-import { analyzeText, type AnalyzeResponse, type HighlightSpan, type RiskLevel } from "../lib/api";
+import { analyze, type AnalyzeResponse, type AnalyzeSource, type HighlightSpan, type RiskLevel } from "../lib/api";
 
 type Status = "idle" | "loading" | "done" | "error";
 
@@ -73,6 +73,7 @@ export function Demo() {
   const [text, setText] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [source, setSource] = useState<AnalyzeSource>("server");
   const [analyzed, setAnalyzed] = useState("");
   const [activePreset, setActivePreset] = useState<number | null>(null);
 
@@ -87,8 +88,9 @@ export function Demo() {
     if (!value) return;
     setStatus("loading");
     try {
-      const res = await analyzeText(value, lang);
+      const { result: res, source: src } = await analyze(value, lang);
       setResult(res);
+      setSource(src);
       setAnalyzed(value);
       setStatus("done");
     } catch {
@@ -191,6 +193,8 @@ export function Demo() {
                     )}
                   </div>
                 </div>
+
+                {source === "local" && <p className="local-note">{d.localNote}</p>}
 
                 <div className="r-text">
                   {segments.map((seg, i) =>

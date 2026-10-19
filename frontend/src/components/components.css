@@ -99,7 +99,19 @@
   .nav { display: none; }
 }
 @media (max-width: 560px) {
-  .header-cta { display: none; }
+  .header-controls .header-cta { display: none; }
+  .top .wrap { gap: 12px; }
+  .lang button { padding: 9px 10px; }
+}
+@media (max-width: 400px) {
+  .wrap { padding-inline: 14px; }
+  .top .wrap { gap: 8px; }
+  .logo { font-size: 17px; gap: 7px; }
+  .logo-icon { width: 30px; height: 30px; }
+  .logo small { padding: 2px 5px; font-size: 10px; }
+  .header-controls { gap: 8px; }
+  .lang button { padding: 8px 9px; font-size: 12px; }
+  .theme-toggle { width: 34px; height: 34px; }
 }
 
 /* ---------- Hero (AIMPROVE-style: near-black + spectrum glow) ---------- */

@@ -1,47 +1,57 @@
 # Deploy — ScamCheck KZ
 
-Two parts: a static **frontend** (Vite/React) and an optional **backend** (FastAPI).
-The frontend works on its own — if no backend is reachable it analyzes in the
-browser with a built-in port of the detector, so a static deploy is enough for a
-live demo. Connect the backend when you want the real Python engine to serve results.
+Two parts: a static **frontend** (Vite/React) and a **backend** (FastAPI).
+The frontend works on its own — if the backend is unreachable (or a free-tier
+server is cold), it analyzes in the browser with a built-in port of the detector
+(a 4s request timeout triggers the fallback). Connect the backend to serve the
+real Python engine.
 
-## 1. Frontend → Vercel (recommended, ~2 min)
+Recommended: **frontend → Vercel**, **backend → Render**.
 
-Easiest path — no CLI:
+## 1. Frontend → Vercel (~2 min)
 
-1. Push this repo to GitHub (done: branch `feat/react-frontend-aimprove`).
-2. Go to <https://vercel.com/new> → **Import** this repository.
-3. Set **Root Directory** = `frontend` (Framework auto-detects as **Vite**).
-4. (Optional) add env var `VITE_API_BASE` = your backend URL (see part 2).
-5. **Deploy**. You get a public URL like `https://scamcheck-kz.vercel.app`.
+1. Go to <https://vercel.com/new> → **Import** `abzaliito/antifraud_icore`.
+2. Leave **Root Directory = repo root** — the root `vercel.json` builds `frontend/`
+   and serves `frontend/dist`. (Or set Root Directory = `frontend`; both work.)
+3. **Deploy** → public URL like `https://scamcheck-kz.vercel.app`.
+4. After the backend is live (part 2), add env var **`VITE_API_BASE`** =
+   your backend URL in **Settings → Environment Variables**, then **Redeploy**.
 
-CLI alternative (needs `npm i -g vercel` and `vercel login`):
+CLI alternative: `cd frontend && vercel --prod` (needs `vercel login`).
 
-```bash
-cd frontend
-vercel --prod
+## 2. Backend → Render (~3 min, free)
+
+The repo has a `render.yaml` blueprint.
+
+1. Go to <https://dashboard.render.com> → **New → Blueprint**.
+2. Connect this repo and **Apply** — it reads `render.yaml` and creates a
+   Python web service:
+   - Root Directory: `backend`
+   - Build: `pip install -r requirements.txt`
+   - Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - Health check: `/api/v1/health`
+3. You get a URL like `https://scamcheck-kz-api.onrender.com`.
+   Check it: open `.../api/v1/health` → `{"status":"healthy",...}`, docs at `/docs`.
+
+Manual alternative (no blueprint): New → Web Service → Root Directory `backend`,
+same build/start commands as above.
+
+CORS is open (`allow_origins=["*"]`), so the Vercel frontend can call it cross-origin.
+
+> Free tier sleeps when idle (first request cold ~30–50s). That's fine here: the
+> frontend's 4s timeout falls back to the in-browser engine, so the demo never hangs.
+> For a judged live demo with no cold starts, the static-only path is the safest.
+
+## 3. Wire them together
+
+In Vercel → the project → Settings → Environment Variables:
+
+```
+VITE_API_BASE = https://scamcheck-kz-api.onrender.com
 ```
 
-Any static host works too (Netlify, Cloudflare Pages, GitHub Pages):
-`cd frontend && npm run build` → deploy the `dist/` folder.
-
-## 2. Backend → Render / Railway (optional)
-
-Deploys the FastAPI engine so the live demo uses real server-side analysis.
-
-**Render** (<https://render.com> → New → Web Service → point at this repo):
-
-- Root Directory: `backend`
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-  (a `backend/Procfile` already declares this)
-
-CORS is open (`allow_origins=["*"]`), so the Vercel frontend can call it
-cross-origin. After it's live, set `VITE_API_BASE` in Vercel to the backend URL
-and redeploy the frontend.
-
-> Note: free tiers sleep when idle (cold start ~30s). For a judged live demo the
-> static-only path (built-in detector) avoids cold starts.
+Redeploy the frontend. Now the live demo uses the real backend; if it's cold or
+down, it falls back locally automatically.
 
 ## Local run
 

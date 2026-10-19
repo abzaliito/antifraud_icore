@@ -24,16 +24,27 @@ export interface AnalyzeResponse {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
+// Abort slow/cold backends quickly so we can fall back to the local engine
+// instead of making the user wait on a sleeping free-tier server.
+const REQUEST_TIMEOUT_MS = 4000;
+
 export async function analyzeText(text: string, lang: Lang): Promise<AnalyzeResponse> {
-  const res = await fetch(`${API_BASE}/api/v1/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, lang }),
-  });
-  if (!res.ok) {
-    throw new Error(`Analyze request failed: ${res.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, lang }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`Analyze request failed: ${res.status}`);
+    }
+    return (await res.json()) as AnalyzeResponse;
+  } finally {
+    clearTimeout(timer);
   }
-  return (await res.json()) as AnalyzeResponse;
 }
 
 export type AnalyzeSource = "server" | "local";
